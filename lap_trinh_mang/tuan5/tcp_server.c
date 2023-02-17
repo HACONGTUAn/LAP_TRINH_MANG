@@ -1,0 +1,236 @@
+#include <stdio.h>          /* These are the usual header files */
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <unistd.h>
+#include "Linklist.h"
+#define PORT 5550   /* Port that will be opened */ 
+#define BACKLOG 2   /* Number of allowed connections */
+#define BUFF_SIZE 1024
+char mat_khau[30];
+int count = 0;
+
+int QLTK(char recv_data[]){
+// tim kiem xem ten tai khoan da co trong link list chua
+  struct node *ptr = head;	
+   //bat dau tu phan dau danh sach
+  /* printf("%s %ld -",recv_data,strlen(recv_data));
+   while(ptr != NULL)
+	{        
+	  printf("%s:%ld \n",ptr->name,strlen(ptr->name));
+      ptr = ptr->next;
+      }*/
+ if( find(recv_data) != NULL){
+   return 1;
+ }else{
+   return 0;
+ }
+}
+
+int QLMK(char recv_data[]){
+ 
+  if(find2(recv_data) != NULL){
+    return 1;
+  }
+  else{
+    return 0;
+  }
+
+}
+
+int main()
+{
+  
+  int listen_sock, conn_sock; /* file descriptors */
+  char recv_data[BUFF_SIZE];
+  char luu[BUFF_SIZE - 1];
+  char loi_nhan[BUFF_SIZE];
+  int bytes_sent, bytes_received;
+  struct sockaddr_in server; /* server's address information */
+  struct sockaddr_in client; /* client's address information */
+  int sin_size;
+  int tk,mk;
+  char* remove_n;
+  char* remove_n2;
+  /**************************************************************/
+  // upload data len linklist
+   FILE*fptr;
+  char name[20];
+  char pass[20];
+  int status;
+  struct node *ptr;
+  fptr = fopen("account.txt","r");
+  if(fptr == NULL){
+    printf("khong mo dc file\n");
+  }
+  // dua data vao link_list
+while( fscanf(fptr,"%s %s %d ",name,pass,&status) != EOF){
+	  insertFirst(name,pass,status);
+	}
+ fclose(fptr);
+
+ /************************************************************/
+  //Step 1: Construct a TCP socket to listen connection request
+  if ((listen_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1 ){  /* calls socket() */
+    perror("\nError: ");
+    return 0;
+  }
+  
+  //Step 2: Bind address to socket
+  bzero(&server, sizeof(server));
+  server.sin_family = AF_INET;         
+  server.sin_port = htons(PORT);   /* Remember htons() from "Conversions" section? =) */
+  server.sin_addr.s_addr = htonl(INADDR_ANY);  /* INADDR_ANY puts your IP address automatically */   
+  if(bind(listen_sock, (struct sockaddr*)&server, sizeof(server))==-1){ /* calls bind() */
+    perror("\nError: ");
+		return 0;
+  }     
+  
+  //Step 3: Listen request from client
+  if(listen(listen_sock, BACKLOG) == -1){  /* calls listen() */
+    perror("\nError: ");
+    return 0;
+  }
+  
+	//Step 4: Communicate with client
+  while(1){
+    //accept request
+    sin_size = sizeof(struct sockaddr_in);
+    if ((conn_sock = accept(listen_sock,( struct sockaddr *)&client, &sin_size)) == -1) 
+      perror("\nError: ");
+    
+    printf("You got a connection from %s\n", inet_ntoa(client.sin_addr) ); /* prints client's IP */
+    
+    //start conversation
+    while(1){
+      //receives message from client
+      bytes_received = recv(conn_sock, recv_data, BUFF_SIZE-1, 0); //blocking
+      if (bytes_received <= 0){
+	printf("\nConnection closed");
+	break;
+      }
+      else{
+	
+	recv_data[bytes_received-1] = '\0';
+	printf("\nReceive:%s", recv_data);
+	
+	if((remove_n = strchr(recv_data,'\n')) != NULL)	{
+	  *remove_n = '\0';
+	}
+	
+	tk = QLTK(recv_data);
+	if(tk == 0){
+	  memset(loi_nhan,'\0',(strlen(loi_nhan)+1));
+	  strcpy(loi_nhan,"no User");
+	  bytes_sent = send(conn_sock,loi_nhan,BUFF_SIZE ,0);
+	}
+	else{
+	  	  strcpy(name,recv_data);
+	         ptr = find(name);
+		 if((ptr -> status) == 0){
+		   memset(loi_nhan,'\0',(strlen(loi_nhan)+1));
+		   strcpy(loi_nhan,"account is blocked or inactive ");
+		   bytes_sent = send(conn_sock,loi_nhan,BUFF_SIZE ,0);
+		 }else{
+		 
+		 memset(loi_nhan,'\0',(strlen(loi_nhan)+1));
+		 strcpy(loi_nhan,"Please enter the login password:");
+		 bytes_sent = send(conn_sock,loi_nhan,BUFF_SIZE ,0);
+	  
+		 bytes_received = recv(conn_sock, recv_data, BUFF_SIZE-1, 0); //blocking
+		 if (bytes_received <= 0){
+		   printf("\nConnection closed");
+		   break;
+		 }
+		 
+	  	recv_data[bytes_received] = '\0';
+		printf("\nReceive:%s", recv_data);
+        
+		if((remove_n2 = strchr(recv_data,'\n')) != NULL){
+		  *remove_n2 = '\0';
+		}
+		
+		mk = QLMK(recv_data);
+		
+		  if(count == 3){
+		  printf("tai khoan nay bi khoa\n");
+        	  memset(loi_nhan,'\0',(strlen(loi_nhan)));
+		  strcpy(loi_nhan," Account is blocked!!!");
+		  bytes_sent = send(conn_sock,loi_nhan,BUFF_SIZE ,0);
+	    	  ptr = find(name);
+		  if(ptr != NULL){
+		    ptr-> status = 0;
+		  }
+		  
+		  fptr = fopen("account.txt","w");
+		  
+		  if(fptr == NULL){
+		    printf("khong mo duoc file \n ");
+		    return 1;
+		  }
+		  
+		  ptr = head;
+	       
+		  while(ptr != NULL)
+		    {        
+		      fprintf(fptr,"%s %s %d \n",ptr->name,ptr->pass,ptr->status);
+		      ptr = ptr->next;
+		    }
+		  fclose(fptr);
+		}
+			
+		if(mk == 0 ){
+		   memset(loi_nhan,'\0',(strlen(loi_nhan)));
+		    strcpy(loi_nhan,"Password is not correct.Please try again !");
+		    bytes_sent = send(conn_sock,loi_nhan,BUFF_SIZE ,0);
+		    count ++;		
+		}
+		
+		else{
+		  memset(loi_nhan,'\0',(strlen(loi_nhan)));
+		  strcpy(loi_nhan,"Login is successful !!!");
+		  bytes_sent = send(conn_sock,loi_nhan,BUFF_SIZE ,0);
+		  while(1){
+		    bytes_received = recv(conn_sock, recv_data, BUFF_SIZE-1, 0); //blocking
+		    if (bytes_received <= 0){
+		      printf("\nConnection closed");
+		      break;
+		    }
+		    recv_data[bytes_received-1] = '\0';
+		    printf("\nReceive login :%s", recv_data);
+	
+		    if((remove_n = strchr(recv_data,'\n')) != NULL)	{
+		      *remove_n = '\0';
+		    }
+
+		    if((strcmp(recv_data,"Bye")) == 0){
+		      memset(loi_nhan,'\0',(strlen(loi_nhan)));
+		      strcpy(loi_nhan,"good bye !!!");
+		      bytes_sent = send(conn_sock,loi_nhan,BUFF_SIZE ,0);
+		      break;
+		    }else{
+		       bytes_sent = send(conn_sock,recv_data,BUFF_SIZE-1 ,0);
+		    }
+		  }//while
+		}
+	  
+		 }
+	}
+	
+      }
+      
+      //echo to client
+      bytes_sent = send(conn_sock, recv_data, bytes_received, 0); /* send to the client welcome message */
+      if (bytes_sent <= 0){
+	printf("\nConnection closed");
+	break;
+      }
+    }//end conversation
+    close(conn_sock);	
+  }
+  
+	close(listen_sock);
+	return 0;
+}

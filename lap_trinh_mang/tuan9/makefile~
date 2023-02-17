@@ -1,0 +1,10 @@
+CC=gcc
+CFLAGS=-I.
+
+all: server client
+
+server: tcp_server.c
+	$(CC) -o server server-socket.c -pthread.
+
+client: tcp_client.c
+	$(CC) -o client client-socket.c -pthread.

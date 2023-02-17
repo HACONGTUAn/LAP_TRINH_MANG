@@ -1,0 +1,5 @@
+CC=gcc
+CFLAGS=-I.
+
+pro: Program.c
+	$(CC) -o pro Program.c -I.
